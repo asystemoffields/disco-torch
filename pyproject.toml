@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=77.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "disco-torch"
+version = "0.2.0"
+description = "PyTorch port of DeepMind's Disco103 meta-learned RL update rule"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+    { name = "asystemoffields" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.0",
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+hub = ["huggingface-hub>=0.20"]
+dev = ["pytest", "huggingface-hub>=0.20"]
+
+[project.urls]
+Homepage = "https://github.com/asystemoffields/disco-torch"
+Repository = "https://github.com/asystemoffields/disco-torch"
+Issues = "https://github.com/asystemoffields/disco-torch/issues"
+
+[tool.setuptools.packages.find]
+include = ["disco_torch*"]
