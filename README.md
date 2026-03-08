@@ -33,8 +33,10 @@ pip install disco-torch[dev]       # pytest for development
 
 ## Quick start
 
+**[Open in Google Colab](https://colab.research.google.com/github/asystemoffields/disco-torch/blob/main/examples/catch_colab.ipynb)** — train Catch with Disco103 in 3 cells.
+
 ```bash
-# Run the validated Catch benchmark (~2 hours on GPU, ~99% catch rate)
+# Or run locally (~2 hours on GPU, ~99% catch rate)
 python examples/catch_disco.py
 
 # With A2C baseline for comparison
@@ -144,6 +146,7 @@ disco_torch/
 
 examples/
   catch_disco.py       Validated Catch benchmark with A2C baseline
+  catch_colab.ipynb    Google Colab notebook (3 cells, uses DiscoTrainer)
 
 tests/
   test_utils.py            Unit tests for utility functions
