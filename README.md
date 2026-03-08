@@ -182,7 +182,7 @@ If you use this port, please cite the original paper:
 
 ```bibtex
 @article{oh2025disco,
-  title={Discovering Reinforcement Learning Algorithms},
+  title={Discovering State-Of-The-Art Reinforcement Learning Algorithms},
   author={Oh, Junhyuk and Farquhar, Greg and Kemaev, Iurii and Calian, Dan A. and Hessel, Matteo and Zintgraf, Luisa and Singh, Satinder and van Hasselt, Hado and Silver, David},
   journal={Nature},
   volume={648},
