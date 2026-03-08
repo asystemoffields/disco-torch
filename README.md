@@ -41,43 +41,45 @@ python examples/catch_disco.py
 python examples/catch_disco.py --both
 ```
 
-### Using Disco103 in your own training loop
+### Using `DiscoTrainer` in your own project
+
+`DiscoTrainer` handles meta-state management, target networks, replay buffer,
+gradient clipping, and loss computation automatically:
 
 ```python
-import torch
-from disco_torch import DiscoUpdateRule, UpdateRuleInputs
-from disco_torch.load_weights import download_disco103_weights, load_disco103_weights
+from disco_torch import DiscoTrainer, collect_rollout
 
-# Load the meta-network with pretrained weights
-rule = DiscoUpdateRule().to(device)
-weights_path = download_disco103_weights()  # auto-downloads from HuggingFace
-load_disco103_weights(rule, weights_path)
+# Your agent (must output: logits, y, z, q, aux_pi — see Agent Requirements below)
+agent = YourAgent(obs_dim=64, num_actions=3).to(device)
 
-# Initialize persistent meta-state
-agent_params = dict(agent.named_parameters())
-meta_state = rule.init_meta_state(agent_params, device=device)
+# One line setup — downloads weights, creates optimizer, replay buffer, meta-state
+trainer = DiscoTrainer(agent, device=device, lr=0.01)
 
-# At each learner step:
-# 1. Run meta-network to produce loss targets
-with torch.no_grad():
-    meta_out, new_meta_state = rule.unroll_meta_net(
-        rollout, agent_params, meta_state, unroll_fn, hyper_params
+# Wrap your environment
+env = YourEnv(num_envs=2)
+obs = env.obs()
+lstm_state = agent.init_lstm_state(env.num_envs, device)
+
+def step_fn(actions):
+    rewards, dones = env.step(actions)
+    return env.obs(), rewards, dones
+
+# Training loop
+for step in range(1000):
+    rollout, obs, lstm_state = collect_rollout(
+        agent, step_fn, obs, lstm_state, rollout_len=29, device=device,
     )
+    logs = trainer.step(rollout)  # 32 gradient steps happen inside
 
-# 2. Compute agent loss (KL divergence against meta-network targets)
-policy_loss, logs = rule.agent_loss(rollout, meta_out, hyper_params)
-value_loss, vlogs = rule.agent_loss_no_meta(rollout, meta_out, hyper_params)
-
-# 3. Standard PyTorch backward pass
-total_loss = (policy_loss + value_loss).mean()
-total_loss.backward()
-optimizer.step()
-
-# 4. Carry meta-state forward
-meta_state = new_meta_state
+    if (step + 1) % 50 == 0:
+        print(f"Step {step+1}: loss={logs['total_loss']:.4f}")
 ```
 
-See [`examples/catch_disco.py`](examples/catch_disco.py) for the complete, validated training loop including the agent architecture, replay buffer, and all configuration details.
+### Low-level API
+
+For advanced users who need full control, the underlying `DiscoUpdateRule` is
+also available. See [`examples/catch_disco.py`](examples/catch_disco.py) for
+the complete validated training loop with all details.
 
 ## Agent requirements
 
@@ -93,9 +95,10 @@ Your agent's forward pass must return a dict with these keys:
 
 The reference agent architecture (feedforward MLP + action-conditional LSTM) is implemented in [`examples/catch_disco.py`](examples/catch_disco.py) as `DiscoMLPAgent`.
 
-## Key training loop details
+## Training loop details
 
-These details matter for correct behavior (all handled in the example):
+`DiscoTrainer` handles all of these automatically. Listed here for reference
+and for users of the low-level API:
 
 - **Replay ratio 32**: Run 32 gradient steps per environment step
 - **Per-element gradient clipping**: `grad.clamp_(-1.0, 1.0)` before Adam (not norm clipping)
@@ -135,6 +138,7 @@ disco_torch/
   value_utils.py       V-trace, Retrace Q-values, advantage estimation
   utils.py             batch_lookup, signed_logp1, 2-hot encoding, EMA
   load_weights.py      JAX/Haiku NPZ -> PyTorch weight mapping
+  trainer.py           DiscoTrainer high-level API + collect_rollout
   adapter.py           LLM adapter (experimental)
   grpo.py              GRPO integration (experimental)
 
