@@ -1,6 +1,6 @@
 # disco-torch
 
-A PyTorch port of DeepMind's **Disco103** — the meta-learned reinforcement learning update rule from [*Discovering Reinforcement Learning Algorithms*](https://doi.org/10.1038/s41586-025-09761-x) (Nature, 2025).
+A PyTorch port of DeepMind's **Disco103** — the meta-learned reinforcement learning update rule from [*Discovering State-Of-The-Art Reinforcement Learning Algorithms*](https://doi.org/10.1038/s41586-025-09761-x) (Nature, 2025).
 
 Disco103 is a small neural network (754K params) that **replaces hand-crafted RL loss functions**. Instead of PPO or GRPO, you feed it agent experience and it outputs loss targets. The agent trains by minimizing KL divergence against these targets. It was meta-trained across thousands of environments and generalizes to new tasks as a drop-in update rule.
 
