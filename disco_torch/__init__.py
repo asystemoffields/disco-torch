@@ -3,7 +3,7 @@
 from disco_torch.types import UpdateRuleInputs, ValueOuts, EmaState, MetaNetInputOption, TransformConfig
 from disco_torch.update_rule import DiscoUpdateRule
 from disco_torch.load_weights import load_disco103_weights, download_disco103_weights
-from disco_torch.trainer import DiscoTrainer, collect_rollout, DEFAULT_HYPER_PARAMS
+from disco_torch.trainer import DiscoTrainer, collect_rollout, DEFAULT_HYPER_PARAMS, ClippedAdam
 from disco_torch.adapter import DiscoAdapter, extract_credit, credit_from_lm_rollout
 from disco_torch.grpo import grpo_advantages, modulate_with_credit
 
@@ -12,6 +12,7 @@ __all__ = [
     "DiscoTrainer",
     "collect_rollout",
     "DEFAULT_HYPER_PARAMS",
+    "ClippedAdam",
     # Low-level API
     "DiscoUpdateRule",
     "UpdateRuleInputs",

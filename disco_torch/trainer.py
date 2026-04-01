@@ -55,6 +55,67 @@ _REQUIRED_AGENT_OUT_KEYS = ("logits", "y", "z", "q", "aux_pi")
 
 
 # ---------------------------------------------------------------------------
+# Optimizer matching reference: Adam → clip update → scale by lr
+# ---------------------------------------------------------------------------
+
+class ClippedAdam:
+    """Adam with per-element update clipping.
+
+    Matches the reference optax chain::
+
+        optax.chain(
+            scale_by_adam(),              # update = m_hat / (sqrt(v_hat) + eps)
+            optax.clip(max_delta=1.0),    # clip update to [-1, 1]
+            optax.scale(-lr),             # params -= lr * clipped_update
+        )
+
+    Standard approaches clip raw gradients *before* Adam, but the reference
+    clips the Adam-scaled update *after*.  When ``v`` is small, Adam amplifies
+    gradients significantly, so clipping before vs after produces very
+    different effective step sizes.
+    """
+
+    def __init__(self, params, lr: float = 0.01, betas=(0.9, 0.999),
+                 eps: float = 1e-8, max_delta: float = 1.0):
+        self.params = list(params)
+        self.lr = lr
+        self.beta1, self.beta2 = betas
+        self.eps = eps
+        self.max_delta = max_delta
+        self.t = 0
+        self.m = [torch.zeros_like(p) for p in self.params]
+        self.v = [torch.zeros_like(p) for p in self.params]
+
+    def zero_grad(self):
+        for p in self.params:
+            if p.grad is not None:
+                p.grad.zero_()
+
+    def step(self):
+        self.t += 1
+        for i, p in enumerate(self.params):
+            if p.grad is None:
+                continue
+            g = p.grad.data
+            self.m[i].mul_(self.beta1).add_(g, alpha=1 - self.beta1)
+            self.v[i].mul_(self.beta2).addcmul_(g, g, value=1 - self.beta2)
+            m_hat = self.m[i] / (1 - self.beta1 ** self.t)
+            v_hat = self.v[i] / (1 - self.beta2 ** self.t)
+            # Adam-scaled update, THEN clip, THEN apply lr
+            update = m_hat / (v_hat.sqrt() + self.eps)
+            update.clamp_(-self.max_delta, self.max_delta)
+            p.data.add_(update, alpha=-self.lr)
+
+    def state_dict(self):
+        return {"t": self.t, "m": self.m, "v": self.v}
+
+    def load_state_dict(self, state):
+        self.t = state["t"]
+        self.m = state["m"]
+        self.v = state["v"]
+
+
+# ---------------------------------------------------------------------------
 # Replay buffer (internal)
 # ---------------------------------------------------------------------------
 
@@ -276,8 +337,10 @@ class DiscoTrainer:
             weights_path = download_disco103_weights()
         load_disco103_weights(self.rule, weights_path)
 
-        # Optimizer
-        self.optimizer = torch.optim.Adam(agent.parameters(), lr=lr)
+        # Optimizer (clip update after Adam scaling, matching reference)
+        self.optimizer = ClippedAdam(
+            agent.parameters(), lr=lr, max_delta=max_grad_value,
+        )
 
         # Replay buffer
         self._buffer = _ReplayBuffer(capacity=replay_capacity)
@@ -388,12 +451,9 @@ class DiscoTrainer:
             masks.sum() + 1e-8
         )
 
-        # Backward + per-element gradient clipping
+        # Backward + optimizer step (ClippedAdam clips updates internally)
         self.optimizer.zero_grad()
         total_loss.backward()
-        for p in self.agent.parameters():
-            if p.grad is not None:
-                p.grad.data.clamp_(-self.max_grad_value, self.max_grad_value)
         self.optimizer.step()
 
         # Update meta state

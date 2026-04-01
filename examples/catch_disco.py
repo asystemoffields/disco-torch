@@ -29,7 +29,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from disco_torch import DiscoUpdateRule, UpdateRuleInputs
+from disco_torch import DiscoUpdateRule, UpdateRuleInputs, ClippedAdam
 from disco_torch.load_weights import download_disco103_weights, load_disco103_weights
 
 
@@ -349,7 +349,7 @@ def train_disco(args):
     num_actions = 3
 
     agent = DiscoMLPAgent(obs_dim, num_actions).to(device)
-    optimizer = torch.optim.Adam(agent.parameters(), lr=args.lr)
+    optimizer = ClippedAdam(agent.parameters(), lr=args.lr)
 
     rule = DiscoUpdateRule().to(device)
     if args.weights:
@@ -448,11 +448,6 @@ def train_disco(args):
 
                 optimizer.zero_grad()
                 total_loss.backward()
-
-                # Per-element gradient clipping (matches optax.clip(max_delta=1.0))
-                for p in agent.parameters():
-                    if p.grad is not None:
-                        p.grad.data.clamp_(-1.0, 1.0)
                 optimizer.step()
 
                 # Update meta state after each gradient step
