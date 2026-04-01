@@ -441,8 +441,10 @@ def train_disco(args):
                 policy_loss, p_logs = rule.agent_loss(rollout, meta_out, hyper_params)
                 value_loss, v_logs = rule.agent_loss_no_meta(rollout, meta_out, hyper_params)
 
-                # Mask out terminal steps
-                masks = (1.0 - is_terminal)  # [T, B]
+                # Mask first step after terminal, not the terminal itself
+                # (reference: masks = discounts[:-1] > 0, offset from is_terminal)
+                shift = torch.cat([torch.zeros_like(is_terminal[:1]), is_terminal[:-1]], dim=0)
+                masks = 1.0 - shift
                 total_per_step = policy_loss + value_loss  # [T, B]
                 total_loss = (total_per_step * masks).sum() / (masks.sum() + 1e-8)
 

@@ -445,8 +445,13 @@ class DiscoTrainer:
             rollout, meta_out, self.hyper_params
         )
 
-        # Terminal loss masking
-        masks = 1.0 - is_terminal
+        # Mask first step after terminal (NOT the terminal itself).
+        # Reference uses discounts[:-1] > 0 for masks but discounts[1:] == 0
+        # for is_terminal — they're offset by 1. Terminal steps carry the most
+        # informative loss (outcome at catch/miss); first-of-episode steps are
+        # uninformative (ball just appeared).
+        shift = torch.cat([torch.zeros_like(is_terminal[:1]), is_terminal[:-1]], dim=0)
+        masks = 1.0 - shift
         total_loss = ((policy_loss + value_loss) * masks).sum() / (
             masks.sum() + 1e-8
         )
