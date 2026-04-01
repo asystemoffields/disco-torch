@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "disco-torch"
-version = "0.3.0"
+version = "0.4.0"
 description = "PyTorch port of DeepMind's Disco103 meta-learned RL update rule"
 readme = "README.md"
 requires-python = ">=3.11"

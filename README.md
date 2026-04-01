@@ -6,17 +6,16 @@ Disco103 is a small neural network (754K params) that **replaces hand-crafted RL
 
 ## Validated
 
-This port achieves **99% catch rate** on the reference Catch benchmark, matching the original JAX implementation:
+This port achieves **100% catch rate** on the reference Catch benchmark, matching the original JAX implementation:
 
 ```
-Step   50 | catch=35%     (learning starts)
-Step  500 | catch=52%     (steady improvement)
-Step  700 | catch=75%     (accelerating)
-Step  900 | catch=83%     (past validation threshold)
-Step 1000 | catch=99%     (converged)
+Step   50 | catch=12%      (random)
+Step  250 | catch=18%      (meta-RNN warming up)
+Step  300 | catch=36%      (transition begins)
+Step  350 | catch=95%      (hockey stick)
+Step  400 | catch=100%     (converged)
+Step 1000 | catch=100%     (stable)
 ```
-
-All meta-network outputs match the JAX reference within float32 precision (<1e-6 max diff).
 
 ## Installation
 
@@ -36,7 +35,7 @@ pip install disco-torch[dev]       # pytest for development
 **[Open in Google Colab](https://colab.research.google.com/github/asystemoffields/disco-torch/blob/main/examples/catch_colab.ipynb)** — train Catch with Disco103 in 3 cells.
 
 ```bash
-# Or run locally (~2 hours on GPU, ~99% catch rate)
+# Or run locally
 python examples/catch_disco.py
 
 # With A2C baseline for comparison
@@ -46,7 +45,7 @@ python examples/catch_disco.py --both
 ### Using `DiscoTrainer` in your own project
 
 `DiscoTrainer` handles meta-state management, target networks, replay buffer,
-gradient clipping, and loss computation automatically:
+optimizer, and loss computation automatically:
 
 ```python
 from disco_torch import DiscoTrainer, collect_rollout
@@ -71,7 +70,7 @@ for step in range(1000):
     rollout, obs, lstm_state = collect_rollout(
         agent, step_fn, obs, lstm_state, rollout_len=29, device=device,
     )
-    logs = trainer.step(rollout)  # 32 gradient steps happen inside
+    logs = trainer.step(rollout)  # 1 gradient step per acting step
 
     if (step + 1) % 50 == 0:
         print(f"Step {step+1}: loss={logs['total_loss']:.4f}")
@@ -102,12 +101,12 @@ The reference agent architecture (feedforward MLP + action-conditional LSTM) is 
 `DiscoTrainer` handles all of these automatically. Listed here for reference
 and for users of the low-level API:
 
-- **Replay ratio 32**: Run 32 gradient steps per environment step
-- **Per-element gradient clipping**: `grad.clamp_(-1.0, 1.0)` before Adam (not norm clipping)
-- **Target network**: Polyak averaging with `coeff=0.9` (target tracks current params)
-- **Terminal masking**: Zero out loss at terminal timesteps
+- **1 gradient step per acting step**: Effective replay ratio comes from batch_size=64 with num_envs=2 (each trajectory sampled ~32 times over its buffer lifetime)
+- **ClippedAdam optimizer**: Adam scaling, then per-element clip to [-1, 1], then learning rate — matching the reference's `optax.chain(scale_by_adam(), clip(1.0), scale(-lr))`
+- **Target network**: Polyak averaging with `coeff=0.9` — target slowly tracks current: `target = 0.9 * old_target + 0.1 * current`
+- **Loss masking**: Mask first step of new episodes (uninformative), NOT terminal steps (most informative)
 - **Meta-state persistence**: The meta-network's RNN state carries across all learner steps
-- **`torch.no_grad()`** on `unroll_meta_net`: Required to avoid OOM (14GB -> 2GB VRAM)
+- **`torch.no_grad()`** on `unroll_meta_net`: Required to avoid OOM
 
 ## Architecture
 
@@ -140,33 +139,11 @@ disco_torch/
   value_utils.py       V-trace, Retrace Q-values, advantage estimation
   utils.py             batch_lookup, signed_logp1, 2-hot encoding, EMA
   load_weights.py      JAX/Haiku NPZ -> PyTorch weight mapping
-  trainer.py           DiscoTrainer high-level API + collect_rollout
-  adapter.py           LLM adapter (experimental)
-  grpo.py              GRPO integration (experimental)
+  trainer.py           DiscoTrainer high-level API + collect_rollout + ClippedAdam
 
 examples/
   catch_disco.py       Validated Catch benchmark with A2C baseline
   catch_colab.ipynb    Google Colab notebook (3 cells, uses DiscoTrainer)
-
-tests/
-  test_utils.py            Unit tests for utility functions
-  test_building_blocks.py  Unit tests for network building blocks
-  test_meta_net.py         Snapshot tests for meta-network forward pass
-```
-
-## Numerical validation
-
-All outputs match the JAX reference within float32 precision:
-
-| Output | Max diff | Status |
-|--------|----------|--------|
-| Meta-network outputs (pi, y, z) | < 1.3e-06 | PASS |
-| Value pipeline (all 14 fields) | < 6e-04 | PASS |
-| End-to-end Catch benchmark | 99% catch rate | PASS |
-
-```bash
-pip install disco-torch[dev]
-pytest
 ```
 
 ## Requirements
