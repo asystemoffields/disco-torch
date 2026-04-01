@@ -98,13 +98,21 @@ def estimate_q_values(
     c_t = lambda_ * clipped_rho
 
     T, B = rewards.shape
-    # General off-policy returns from Q and V (matches rlax.general_off_policy_returns_from_q_and_v)
+    # Matches rlax.general_off_policy_returns_from_q_and_v as called by the
+    # reference with _add_first(rewards/discounts).  The reference prepends a
+    # dummy zero to rewards and discounts (making them T+1) but NOT to c_t or
+    # target_q_a (which stay T).  Inside the rlax loop this shifts the c/q
+    # indices by +1 for all but the last timestep (JAX JIT clips the
+    # out-of-bounds access silently).  The Disco103 meta-network was
+    # meta-trained with this behaviour, so we must reproduce it exactly.
     q_target = torch.zeros(T, B, device=rewards.device)
     q_target[T - 1] = rewards[T - 1] + discounts[T - 1] * target_values[T]
     for t in range(T - 2, -1, -1):
+        # c/q index is t+2, clamped to T-1 (matches reference's off-by-one)
+        idx = min(t + 2, T - 1)
         q_target[t] = rewards[t] + discounts[t] * (
             target_values[t + 1]
-            + c_t[t + 1] * (q_target[t + 1] - target_q_a[t + 1])
+            + c_t[idx] * (q_target[t + 1] - target_q_a[idx])
         )
 
     qv_adv = target_q_values - target_values.unsqueeze(-1)
