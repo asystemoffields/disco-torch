@@ -417,7 +417,7 @@ def train_disco(args):
         # 2. Add to replay buffer
         replay_buffer.add(rollout_data)
 
-        # 3. REPLAY_RATIO learner steps per acting step (matching reference)
+        # 3. Gradient steps per acting step (reference uses 1)
         for _ in range(args.replay_ratio):
             if len(replay_buffer.buffer) < args.batch_size:
                 break
@@ -645,7 +645,7 @@ def main():
     parser.add_argument("--num-envs", type=int, default=2)
     parser.add_argument("--rollout-len", type=int, default=29)
     parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--replay-ratio", type=int, default=32)
+    parser.add_argument("--replay-ratio", type=int, default=1)
     parser.add_argument("--buffer-capacity", type=int, default=1024)
     parser.add_argument("--num-steps", type=int, default=1000)
     parser.add_argument("--lr", type=float, default=0.01)

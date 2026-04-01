@@ -208,7 +208,9 @@ class DiscoTrainer:
             :data:`DEFAULT_HYPER_PARAMS`.
         replay_capacity: Replay buffer capacity (default 1024).
         batch_size: Batch size for sampling from replay buffer (default 64).
-        replay_ratio: Gradient steps per acting step (default 32).
+        replay_ratio: Gradient steps per acting step (default 1).
+            The reference uses batch_size=64 with num_envs=2 for an
+            effective data reuse ratio of 32, with 1 gradient step.
         weights_path: Path to ``disco_103.npz``. Auto-downloads from
             HuggingFace if not given.
         max_grad_value: Per-element gradient clipping bound (default 1.0).
@@ -236,7 +238,7 @@ class DiscoTrainer:
         hyper_params: dict[str, float] | None = None,
         replay_capacity: int = 1024,
         batch_size: int = 64,
-        replay_ratio: int = 32,
+        replay_ratio: int = 1,
         weights_path: str | None = None,
         max_grad_value: float = 1.0,
     ):
@@ -250,7 +252,7 @@ class DiscoTrainer:
         if replay_ratio < 1:
             raise ValueError(
                 f"replay_ratio must be >= 1, got {replay_ratio}. "
-                f"The reference uses 32 gradient steps per acting step."
+                f"The reference uses 1 gradient step per acting step."
             )
 
         # Device

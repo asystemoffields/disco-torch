@@ -180,10 +180,11 @@ class DiscoUpdateRule(nn.Module):
         meta_out["normalized_q_td"] = value_outs.normalized_q_td
         meta_out["target_out"] = target_out
 
-        # Update target params with exponential moving average
+        # Update target params with Polyak averaging (target slowly tracks current)
+        # Reference: lambda old, new: old * coeff + (1 - coeff) * new
         coeff = hyper_params.get("target_params_coeff", 0.9)
         new_target_params = {
-            k: agent_params[k] * coeff + meta_state["target_params"][k] * (1.0 - coeff)
+            k: meta_state["target_params"][k] * coeff + agent_params[k] * (1.0 - coeff)
             for k in agent_params
         }
 
